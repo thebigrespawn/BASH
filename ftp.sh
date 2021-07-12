@@ -6,15 +6,85 @@
 #         menu_vsftpd
 #     done
 # }
+
 SETTINGS_LO="/home/x/Desktop/BASH/"
 SETTINGS_FILE="testconfig.txt"
 SETTINGS_LOC=${SETTINGS_LO}${SETTINGS_FILE}
 
+
+backup_manager(){
+BACKUP_FOLDER="BACKconf/"
+BACKLOG_FILE="BACKlog.txt"
+    case $1 in 
+    create)
+        while read -p " Do you want to make a backup of current settings? [y/n] 
+>" DEF
+        do
+            case $DEF in 
+                y)  
+                    read -p "insert name for your backup file" N
+                    echo "your settings are backed up as ----${N}BACK${SETTINGS_FILE}----"
+                    [ -d "${SETTINGS_LO}${BACKUP_FOLDER}" ] || sudo mkdir "${SETTINGS_LO}${BACKUP_FOLDER}"
+                    echo "${SETTINGS_LO}${N}BACK${SETTINGS_FILE}" >> "${SETTINGS_LO}${BACKUP_FOLDER}${BACKLOG_FILE}"
+                    cp ${SETTINGS_LOC} "${SETTINGS_LO}${BACKUP_FOLDER}${N}BACK${SETTINGS_FILE}"
+                    ;;
+                n)
+                    echo "Okay, no backup"
+                    ;;
+                *)
+                    echo "insert valid settings"
+                    continue
+                    ;;
+            esac
+        break
+        done
+    delete)
+        while cat "${SETTINGS_LO}${BACKUP_FOLDER}${BACKLOG_FILE}" & read -p "insert name of backup you want to delete 
+> " DEL
+        do
+            if [ -e "${SETTINGS_LO}${BACKUP_FOLDER}${DEL}BACK${SETTINGS_FILE}"]
+            then
+                rm "${SETTINGS_LO}${BACKUP_FOLDER}${DEL}BACK${SETTINGS_FILE}"
+                sed -i /"${DEL}BACK${SETTINGS_FILE}"/d "${SETTINGS_LO}${BACKUP_FOLDER}${BACKLOG_FILE}"
+            else 
+                echo "there is no such backup"
+                continue
+            fi
+        break
+        done
+        ;;
+
+
+    esac    
+}
+
+
 settings_backup(){
-    cp $SETTINGS_LOC $SETTINGS_LO${1}"BACK"${SETTINGS_FILE}
+    while read -p " Do you want to make a backup of current settings? [y/n] 
+>" DEF
+    do
+        case $DEF in 
+            y)  
+                read -p "insert name for your backup file" N
+                echo "your settings are backed up as ---${N}BACK.vsftpd.config----"
+                manage_backups $N
+                cp $SETTINGS_LOC $SETTINGS_LO"BACKconf/"${N}"BACK"${SETTINGS_FILE}
+                ;;
+            n)
+                echo "Okay, no backup"
+                ;;
+            *)
+                echo "insert valid settings"
+                continue
+                ;;
+        esac
+    break
+    done
 
 
 }
+
+
 menu_vsftpd(){ #menu for vsftpd installation
         echo "
         Welcome to the vsftpd installer!
@@ -23,47 +93,75 @@ menu_vsftpd(){ #menu for vsftpd installation
     while true
     do
         echo "PLEASE CHOOSE WHAT YOU WANT TO DO"
-        echo "1 - express vsftpd installation"
-        echo "2 - step by step installation/modificaton"
-        echo "3 - check vsftpd STATUS"
-        echo "4 - open vsftpd CONFIG"
-        echo "5 - turn vsftpd ON"
-        echo "6 - turn vsftpd OFF"
+        echo "1 - install default vsftpd without configuration"
+        echo "2 - install with manual configuration"
+        echo "3 - install express with common settings"
+        echo "4 - apply config file from path or backup"
+        echo "5 - open vsftpd CONFIG"
+        echo "6 - check vsftpd STATUS"
+        echo "7 - turn vsftpd ON"
+        echo "8 - turn vsftpd OFF"
+        echo "clean - delete all backups"
         echo "reset - RESET vsftpd config file"
+        echo "delete - delete vsftpd from machine"
         echo "q - quit installer
         "
-        read -p ">" MENU
+        read -p "> " MENU
         echo "
         
         "
 
         case $MENU in
             1)
-                vsftpd_check
-                default_settings
-                allow_vsftpd
-                vsftpd_status
+                vsftpd_manager "check"
                 ;;
             2)
-                vsftpd_check
-                settings
-                allow_vsftpd
-                vsftpd_status
+                vsftpd_manager "check"
+                manual_settings ${SETTINGS_LOC}
+                vsftpd_manager "turnon"
+                vsftpd_manager "status"
+                echo "Going back to menu"
+                sleep 1
                 ;;
+
             3)
-                vsftpd_status
+                vsftpd_manager "check"
+                default_settings ${SETTINGS_LOC}
+                vsftpd_manager "turnon"
+                vsftpd_manager "status"
+                echo "Going back to menu"
+                sleep 1
                 ;;
-            4)
-                manual_settings
+            4)  settings_manager
                 ;;
             5)
-                allow_vsftpd
+                manual_settings ${SETTINGS_LOC}
+                echo "Going back to menu"
+                sleep 1
+                ;;
+            6)
+                vsftpd_manager "status"
+                echo "Going back to menu"
+                sleep 1
+                ;;
+            
+            7)
+                vsftpd_manager "turnon"
+                echo "Going back to menu"
+                sleep 1
+                ;;
+            8)
+                vsftpd_manager "turnoff"
+                echo "Going back to menu"
+                sleep 1
                 ;;
             q)
                 break
                 ;;
             reset)
-                reset_settings
+                reset_settings ${SETTINGS_LOC}
+                echo "Going back to menu"
+                sleep 1
                 ;;
             *)
                 echo "
@@ -77,47 +175,10 @@ menu_vsftpd(){ #menu for vsftpd installation
     done 
 }
 
-vsftpd_status(){ #displays vsftpd server's status
-
-    sudo systemctl status vsftpd.service
-}
-
-vsftpd_check(){ #checks system for vsftpd existance, if there is no vsftpd the istallation starts
-
-echo "Lets check whether you have VSFTPD"
-[ -e /etc/vsftpd.conf ] && echo "vsftpd is alredy here" || ( echo "installing vsftpd" & sudo apt install vsftpd)
-}
-
-
-confirm_manual_settings(){ #mechanism to make manual installation invertible
-
-while read -p "Are you done your manual settings? 
-> " CONFIRMATION
-do
-    case $CONFIRMATION in 
-    y) 
-        echo "
-        Okay let's continue"
-        ;;
-    n)  
-        echo "
-        Going back to gedit"
-        sleep 1
-        gedit_editor $1
-        continue
-        ;;
-
-    *) 
-        echo "
-        please insert 'y' or 'n'"
-        continue
-        ;;
-    esac
-    break
-done 
-}
 
 reset_settings(){ #resets vsftpd settings SPECIFY CONFIG PATH
+
+settings_backup
 
 echo "# Example config file /etc/vsftpd.conf
 #
@@ -235,30 +296,55 @@ listen=YES
 # This directive enables listening on IPv6 sockets. To listen on IPv4 and IPv6
 # sockets, you must run two copies of vsftpd with two configuration files.
 # Make sure, that one of the listen options is commented !!
-#listen_ipv6=YES" > ${SETTINGS_LOC}
-
-}
-
-gedit_editor(){ #opens gedit for the requested path
-    sudo gedit $1
+#listen_ipv6=YES" > ${1}
+echo "
+SETTINGS ARE RESETED
+"
 }
 
 
 manual_settings(){ #encapsulated manual settings
+echo "Manual settings are going to be applied"
+    settings_backup
     sleep 1
-    gedit_editor $1
-    confirm_manual_settings $1
+    sudo gedit $1
+while read -p "Are you done your manual settings? 
+> " CONFIRMATION
+do
+    case $CONFIRMATION in 
+    y) 
+        echo "
+        Okay let's continue"
+        ;;
+    n)  
+        echo "
+        Going back to gedit"
+        sleep 1
+        sudo gedit $1
+        continue
+        ;;
+
+    *) 
+        echo "
+        please insert 'y' or 'n'"
+        continue
+        ;;
+    esac
+    break
+done 
 }
 
 
 
-
 default_settings(){ #use common settings with vsftpd
+echo "Default settings are going to be applied"
+settings_backup
+sleep 2
+echo "Your default settings are applied to the file $1
 
-echo "Your default settings are applied to the file /etc/vsftpd.conf
-Please define range of ports"
+"
 
-while read -p "Please insert port range 
+while read -p "Please specify port range for this server
 > " LOW HIGH
 do
     if [ $HIGH -gt $LOW ] && [ $HIGH -lt 65535 ]
@@ -292,84 +378,39 @@ pasv_max_port=${HIGH}
 allow_writeable_chroot=YES
 ssl_tlsv1=YES
 ssl_sslv2=NO
-ssl_sslv3=NO" > ${SETTINGS_LOC} #-----------------Edit it to the real path at the end of testing-----------------    
+ssl_sslv3=NO" > ${1} #-----------------Edit it to the real path at the end of testing-----------------    
 sudo ufw allow 20/tcp
 sudo ufw allow 21/tcp
 # sudo ufw allow $LOW:$HIGH/tcp #here is firewall port regarding rules
+
+echo "
+
+Your default settings are applied to the file $1
+
+"
 }
 
 
-settings(){ #choose the way to set config file
-
-
-while read -p "Do you want default settings ? [y/n]
-
-WARNING : Default settings would delete all your previos settings 
-
-> " SETTINGS
-do  
-    case $SETTINGS in 
-        y)
-            read -p "Default settings are going to be applied
-
-            Do you want to make a backup of current settings? [y/n] 
-            >" DEF
-            while true
-            do
-                case $DEF in 
-                    y)  
-                        read -p "insert prefix for your backup name" N
-                        settings_backup $N
-                        echo "your settings are backed up as ${N}BACK.vsftpd.config"
-                        ;;
-                    n)
-                        echo "okay, no backup"
-                    *)
-                        echo "insert valid settings"
-                        ;;
-                esac
-            done
-            default_settings ${SETTINGS_LOC}
-            ;;
-
-        n)
-            echo "Please set parameters in yourself, gedit will open now"
-            manual_settings ${SETTINGS_LOC}
-            ;;
-
-        *) 
-            echo "Please insert 'y' or 'n' letters"
-            continue
-            ;;
+vsftpd_manager(){
+    case $1 in 
+    check)
+        echo "Lets check whether you have VSFTPD"
+        [ -e /etc/vsftpd.conf ] && echo "vsftpd is alredy here" || ( echo "installing vsftpd" & sudo apt install vsftpd)
+        ;;
+    status)
+        sudo systemctl status vsftpd.service
+        ;;
+    turnon)
+        sudo systemctl enable vsftpd.service
+        sudo systemctl start vsftpd.service
+        sudo systemctl restart vsftpd.service
+        ;;
+    turnoff)
+        sudo systemctl stop vsftpd.service
+        sudo systemctl disable vsftpd.service
+        ;;
     esac
-
-    break
-done
-}
-allow_vsftpd(){ #turn vsftpd ON
-sudo systemctl enable vsftpd.service
-sudo systemctl start vsftpd.service
-sudo systemctl restart vsftpd.service
-vsftpd_status
-while read -p "Are you okay with status? 
-> " CONFIRMATION
-do
-    if [ "$CONFIRMATION" = "y" ] 
-    then 
-        echo "Okay let's continue"
-    elif [ "$CONFIRMATION" = "n" ] 
-    then 
-        echo "Going back to menu"
-        sleep 1
-        menu_vsftpd
-    else 
-        echo "please insert 'y' or 'n'"
-        continue
-    fi
-    break
-done
 }
 
 #-------------------------------------------------------------MAIN-----------------------------------------------------------
 menu_vsftpd
-echo "program terminated"
