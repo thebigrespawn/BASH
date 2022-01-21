@@ -1,1 +1,1 @@
-BASH scripting polygon to automate server deployment on VM
+BASH scripting polygon to automate vsftpd deployment on VM
