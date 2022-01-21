@@ -1,1 +1,1 @@
-BASH scripting polygon to automate vsftpd deployment on VM
+Wrote script for vsftpd installation, found out that Ansible is better for such purposes :)
